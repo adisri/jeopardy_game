@@ -323,12 +323,6 @@ body {
 }
 
 /* ===== GAME BOARD ===== */
-#game-board {
-  display: grid;
-  gap: 4px;
-  padding: 16px;
-  flex: 1;
-}
 
 .board-header-cell {
   background: #060ce9;
@@ -510,4 +504,161 @@ body {
   text-align: center;
   padding: 40px;
   color: rgba(255,255,255,0.5);
+}
+
+/* ===== BOARD LAYOUT (board + scoreboard sidebar) ===== */
+.board-layout {
+  display: flex;
+  flex-direction: row;
+  flex: 1;
+}
+
+#game-board {
+  display: grid;
+  gap: 4px;
+  padding: 16px;
+  flex: 1;
+  align-content: start;
+}
+
+#scoreboard {
+  width: 200px;
+  flex-shrink: 0;
+  padding: 16px;
+  border-left: 2px solid #d4a017;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.scoreboard-title {
+  color: #d4a017;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  font-size: 0.85rem;
+  margin-bottom: 4px;
+}
+
+.scoreboard-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 0;
+  border-bottom: 1px solid rgba(255,255,255,0.1);
+  font-size: 0.9rem;
+}
+
+.scoreboard-row.leader {
+  color: #d4a017;
+  font-weight: bold;
+}
+
+.scoreboard-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 120px;
+}
+
+.scoreboard-score {
+  font-weight: bold;
+  flex-shrink: 0;
+}
+
+/* ===== MODAL ATTRIBUTION ===== */
+.modal-attribution {
+  border-top: 1px solid rgba(212, 160, 23, 0.4);
+  padding-top: 16px;
+}
+
+.attribution-prompt {
+  font-size: 0.8rem;
+  color: #d4a017;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  margin-bottom: 12px;
+  text-align: center;
+}
+
+#attribution-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: center;
+}
+
+.btn-attribution {
+  padding: 8px 16px;
+  font-size: 0.85rem;
+}
+
+.btn-ghost {
+  background: transparent;
+  color: rgba(255,255,255,0.45);
+  border: 1px solid rgba(255,255,255,0.2);
+}
+
+.btn-ghost:hover {
+  background: rgba(255,255,255,0.06);
+  color: rgba(255,255,255,0.7);
+}
+
+/* ===== FINAL SCORES SCREEN ===== */
+.final-winner {
+  text-align: center;
+  margin-bottom: 32px;
+}
+
+.final-crown {
+  font-size: 3rem;
+  margin-bottom: 8px;
+}
+
+.final-winner-name {
+  font-size: clamp(1.5rem, 5vw, 2.5rem);
+  color: #d4a017;
+  font-weight: bold;
+  text-transform: uppercase;
+  letter-spacing: 2px;
+}
+
+.final-winner-score {
+  font-size: clamp(1.2rem, 4vw, 2rem);
+  color: #fff;
+  margin-top: 4px;
+}
+
+#final-scores-list {
+  width: 100%;
+  max-width: 400px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 32px;
+}
+
+.final-rank-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 16px;
+  border: 1px solid rgba(255,255,255,0.2);
+  border-radius: 4px;
+  gap: 12px;
+}
+
+.final-rank-number {
+  color: rgba(255,255,255,0.5);
+  font-size: 0.8rem;
+  min-width: 24px;
+}
+
+.final-rank-name {
+  flex: 1;
+  font-size: 1rem;
+}
+
+.final-rank-score {
+  font-weight: bold;
+  color: #d4a017;
 }

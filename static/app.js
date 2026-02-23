@@ -5,9 +5,11 @@ const state = {
     numCategories: 6,
     numQuestions: 5,
     pointValues: [200, 400, 600, 800, 1000],
+    players: ['Player 1', 'Player 2'],
   },
   categories: [],        // [{name, questions: [{question, answer, points}]}]
   answeredCells: {},     // "catIdx-qIdx" → true
+  scores: {},            // { 'Player 1': 0, 'Player 2': 0 }
   currentCell: null,     // {catIdx, qIdx} while modal open
 };
 
@@ -50,12 +52,39 @@ function showScreen(name) {
   document.getElementById(`screen-${name}`).classList.remove('hidden');
 }
 
+// ===== PLAYER NAME INPUTS (shared by config + players screens) =====
+function buildPlayerNameInputs(containerId, count, existing = []) {
+  const container = document.getElementById(containerId);
+  container.innerHTML = '';
+
+  for (let i = 0; i < count; i++) {
+    const group = document.createElement('div');
+    group.className = 'form-group';
+
+    const label = document.createElement('label');
+    label.textContent = `Player ${i + 1} Name`;
+
+    const input = document.createElement('input');
+    input.type = 'text';
+    input.placeholder = `Player ${i + 1}`;
+    input.dataset.playerIdx = i;
+    input.value = existing[i] || '';
+
+    group.appendChild(label);
+    group.appendChild(input);
+    container.appendChild(group);
+  }
+}
+
 // ===== CONFIG SCREEN =====
 function initConfigScreen() {
   document.getElementById('game-name').value = state.config.gameName || '';
   document.getElementById('num-categories').value = state.config.numCategories;
   document.getElementById('num-questions').value = state.config.numQuestions;
   document.getElementById('point-values').value = state.config.pointValues.join(',');
+  const numPlayers = state.config.players ? state.config.players.length : 2;
+  document.getElementById('num-players').value = numPlayers;
+  buildPlayerNameInputs('player-names-container', numPlayers, state.config.players || []);
   hideError('config-error');
 }
 
@@ -64,6 +93,7 @@ function validateAndAdvanceConfig() {
   const numCat = parseInt(document.getElementById('num-categories').value, 10);
   const numQ = parseInt(document.getElementById('num-questions').value, 10);
   const pvRaw = document.getElementById('point-values').value.trim();
+  const numPlayers = parseInt(document.getElementById('num-players').value, 10);
 
   if (isNaN(numCat) || numCat < 1 || numCat > 10) {
     showError('config-error', 'Number of categories must be between 1 and 10.');
@@ -85,8 +115,18 @@ function validateAndAdvanceConfig() {
     return;
   }
 
+  if (isNaN(numPlayers) || numPlayers < 1 || numPlayers > 8) {
+    showError('config-error', 'Number of players must be between 1 and 8.');
+    return;
+  }
+
+  const players = [];
+  document.querySelectorAll('#player-names-container input[data-player-idx]').forEach((input, i) => {
+    players.push(input.value.trim() || `Player ${i + 1}`);
+  });
+
   hideError('config-error');
-  state.config = { gameName, numCategories: numCat, numQuestions: numQ, pointValues };
+  state.config = { gameName, numCategories: numCat, numQuestions: numQ, pointValues, players };
   buildSetupScreen();
   showScreen('setup');
 }
@@ -198,9 +238,14 @@ function readSetupFormData() {
 
 // ===== BOARD =====
 function buildBoard() {
+  // Initialize scores from current player list
+  state.scores = {};
+  const players = state.config.players || [];
+  players.forEach(p => { state.scores[p] = 0; });
+
   const board = document.getElementById('game-board');
   board.innerHTML = '';
-  const { categories, config } = state;
+  const { categories } = state;
   const numCat = categories.length;
 
   board.style.gridTemplateColumns = `repeat(${numCat}, 1fr)`;
@@ -231,8 +276,40 @@ function buildBoard() {
   }
 
   // Set board title
-  const title = document.getElementById('board-title');
-  title.textContent = state.config.gameName || 'Pooja-pardy!';
+  document.getElementById('board-title').textContent = state.config.gameName || 'Jeopardy!';
+
+  updateScoreboard();
+}
+
+// ===== SCOREBOARD =====
+function updateScoreboard() {
+  const container = document.getElementById('scoreboard-players');
+  container.innerHTML = '';
+
+  const players = state.config.players || [];
+  if (players.length === 0) return;
+
+  const maxScore = Math.max(...players.map(p => state.scores[p] || 0));
+
+  players.forEach(player => {
+    const score = state.scores[player] || 0;
+    const isLeader = score === maxScore && maxScore > 0;
+
+    const row = document.createElement('div');
+    row.className = 'scoreboard-row' + (isLeader ? ' leader' : '');
+
+    const name = document.createElement('span');
+    name.className = 'scoreboard-name';
+    name.textContent = player;
+
+    const scoreEl = document.createElement('span');
+    scoreEl.className = 'scoreboard-score';
+    scoreEl.textContent = `$${score}`;
+
+    row.appendChild(name);
+    row.appendChild(scoreEl);
+    container.appendChild(row);
+  });
 }
 
 // ===== MODAL =====
@@ -246,20 +323,48 @@ function openQuestion(catIdx, qIdx) {
   document.getElementById('modal-question').textContent = q.question;
   document.getElementById('modal-answer').textContent = q.answer;
 
-  const answerArea = document.getElementById('modal-answer-area');
-  answerArea.classList.add('hidden');
-
-  const showBtn = document.getElementById('btn-show-answer');
-  showBtn.classList.remove('hidden');
+  document.getElementById('modal-answer-area').classList.add('hidden');
+  document.getElementById('modal-attribution').classList.add('hidden');
+  document.getElementById('attribution-buttons').innerHTML = '';
+  document.getElementById('btn-show-answer').classList.remove('hidden');
+  document.getElementById('btn-close-modal').classList.remove('hidden');
 
   document.getElementById('question-modal').classList.remove('hidden');
 }
 
-function closeModal(markAnswered) {
+function buildAttributionButtons() {
+  const container = document.getElementById('attribution-buttons');
+  container.innerHTML = '';
+
+  const players = state.config.players || [];
+  players.forEach((player, idx) => {
+    const btn = document.createElement('button');
+    btn.className = 'btn btn-secondary btn-attribution';
+    btn.textContent = player;
+    btn.addEventListener('click', () => closeModal(true, idx));
+    container.appendChild(btn);
+  });
+
+  const nobodyBtn = document.createElement('button');
+  nobodyBtn.className = 'btn btn-ghost btn-attribution';
+  nobodyBtn.textContent = 'Nobody';
+  nobodyBtn.addEventListener('click', () => closeModal(true, null));
+  container.appendChild(nobodyBtn);
+}
+
+function closeModal(markAnswered, playerIdx = null) {
   if (markAnswered && state.currentCell) {
     const { catIdx, qIdx } = state.currentCell;
     const key = `${catIdx}-${qIdx}`;
     state.answeredCells[key] = true;
+
+    // Award points to the player who got it right
+    if (playerIdx !== null) {
+      const player = state.config.players[playerIdx];
+      const points = state.categories[catIdx].questions[qIdx].points;
+      state.scores[player] = (state.scores[player] || 0) + points;
+      updateScoreboard();
+    }
 
     // Update the board cell visually
     const board = document.getElementById('game-board');
@@ -273,8 +378,76 @@ function closeModal(markAnswered) {
       cell.removeEventListener('click', cell._clickHandler);
     }
   }
+
   state.currentCell = null;
   document.getElementById('question-modal').classList.add('hidden');
+
+  if (markAnswered) {
+    checkGameOver();
+  }
+}
+
+// ===== GAME OVER =====
+function checkGameOver() {
+  if (state.categories.length === 0) return;
+  const total = state.categories.length * state.categories[0].questions.length;
+  if (Object.keys(state.answeredCells).length >= total) {
+    buildFinalScreen();
+    showScreen('final');
+  }
+}
+
+function buildFinalScreen() {
+  const players = state.config.players || [];
+  const sorted = [...players].sort((a, b) => (state.scores[b] || 0) - (state.scores[a] || 0));
+
+  const winnerArea = document.getElementById('final-winner-area');
+  const scoresList = document.getElementById('final-scores-list');
+  winnerArea.innerHTML = '';
+  scoresList.innerHTML = '';
+
+  if (sorted.length === 0) return;
+
+  const winner = sorted[0];
+  const winnerScore = state.scores[winner] || 0;
+
+  winnerArea.innerHTML = `
+    <div class="final-winner">
+      <div class="final-crown">👑</div>
+      <div class="final-winner-name">${winner}</div>
+      <div class="final-winner-score">$${winnerScore}</div>
+    </div>
+  `;
+
+  sorted.slice(1).forEach((player, i) => {
+    const score = state.scores[player] || 0;
+    const row = document.createElement('div');
+    row.className = 'final-rank-row';
+
+    const rank = document.createElement('span');
+    rank.className = 'final-rank-number';
+    rank.textContent = `#${i + 2}`;
+
+    const name = document.createElement('span');
+    name.className = 'final-rank-name';
+    name.textContent = player;
+
+    const scoreEl = document.createElement('span');
+    scoreEl.className = 'final-rank-score';
+    scoreEl.textContent = `$${score}`;
+
+    row.appendChild(rank);
+    row.appendChild(name);
+    row.appendChild(scoreEl);
+    scoresList.appendChild(row);
+  });
+}
+
+// ===== PLAYERS SCREEN (for loaded games) =====
+function initPlayersScreen() {
+  const numPlayers = (state.config.players && state.config.players.length) ? state.config.players.length : 2;
+  document.getElementById('num-players-load').value = numPlayers;
+  buildPlayerNameInputs('player-names-container-load', numPlayers, state.config.players || []);
 }
 
 // ===== LOAD SCREEN =====
@@ -323,8 +496,8 @@ async function loadGamesScreen() {
           state.config = fullGame.config;
           state.categories = fullGame.categories;
           state.answeredCells = {};
-          buildBoard();
-          showScreen('board');
+          initPlayersScreen();
+          showScreen('players');
         } catch (e) {
           alert('Failed to load game: ' + e.message);
         }
@@ -386,6 +559,16 @@ document.getElementById('btn-load-game').addEventListener('click', () => {
 // Config
 document.getElementById('btn-config-back').addEventListener('click', () => showScreen('landing'));
 document.getElementById('btn-config-next').addEventListener('click', validateAndAdvanceConfig);
+
+document.getElementById('num-players').addEventListener('input', () => {
+  const count = parseInt(document.getElementById('num-players').value, 10);
+  if (!isNaN(count) && count >= 1 && count <= 8) {
+    const existing = Array.from(
+      document.querySelectorAll('#player-names-container input[data-player-idx]')
+    ).map(inp => inp.value);
+    buildPlayerNameInputs('player-names-container', count, existing);
+  }
+});
 
 // Setup
 document.getElementById('btn-setup-back').addEventListener('click', () => {
@@ -449,9 +632,12 @@ document.getElementById('btn-board-back').addEventListener('click', () => showSc
 document.getElementById('btn-show-answer').addEventListener('click', () => {
   document.getElementById('modal-answer-area').classList.remove('hidden');
   document.getElementById('btn-show-answer').classList.add('hidden');
+  document.getElementById('btn-close-modal').classList.add('hidden');
+  document.getElementById('modal-attribution').classList.remove('hidden');
+  buildAttributionButtons();
 });
 
-document.getElementById('btn-close-modal').addEventListener('click', () => closeModal(true));
+document.getElementById('btn-close-modal').addEventListener('click', () => closeModal(false));
 
 document.getElementById('modal-backdrop').addEventListener('click', () => closeModal(false));
 
@@ -463,6 +649,33 @@ document.addEventListener('keydown', (e) => {
     }
   }
 });
+
+// Players screen (load flow)
+document.getElementById('btn-players-back').addEventListener('click', () => showScreen('load'));
+
+document.getElementById('num-players-load').addEventListener('input', () => {
+  const count = parseInt(document.getElementById('num-players-load').value, 10);
+  if (!isNaN(count) && count >= 1 && count <= 8) {
+    const existing = Array.from(
+      document.querySelectorAll('#player-names-container-load input[data-player-idx]')
+    ).map(inp => inp.value);
+    buildPlayerNameInputs('player-names-container-load', count, existing);
+  }
+});
+
+document.getElementById('btn-players-start').addEventListener('click', () => {
+  const players = [];
+  document.querySelectorAll('#player-names-container-load input[data-player-idx]').forEach((input, i) => {
+    players.push(input.value.trim() || `Player ${i + 1}`);
+  });
+  state.config.players = players;
+  state.answeredCells = {};
+  buildBoard();
+  showScreen('board');
+});
+
+// Final screen
+document.getElementById('btn-final-home').addEventListener('click', () => showScreen('landing'));
 
 // Load
 document.getElementById('btn-load-back').addEventListener('click', () => showScreen('landing'));

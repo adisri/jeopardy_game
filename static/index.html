@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Pooja-pardy!</title>
+  <title>Jeopardy!</title>
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>
@@ -11,7 +11,7 @@
   <!-- LANDING SCREEN -->
   <div id="screen-landing" class="screen">
     <div class="center-content">
-      <h1 class="title">Pooja-pardy!</h1>
+      <h1 class="title">Jeopardy!</h1>
       <div class="landing-buttons">
         <button class="btn btn-primary" id="btn-new-game">New Game</button>
         <button class="btn btn-secondary" id="btn-load-game">Load Game</button>
@@ -28,7 +28,7 @@
     <div class="form-container">
       <div class="form-group">
         <label for="game-name">Game Name (optional)</label>
-        <input type="text" id="game-name" placeholder="e.g. Pooja's Birthday Bash" />
+        <input type="text" id="game-name" placeholder="e.g. Game Night 2026" />
       </div>
       <div class="form-group">
         <label for="num-categories">Number of Categories</label>
@@ -42,6 +42,11 @@
         <label for="point-values">Point Values (comma-separated)</label>
         <input type="text" id="point-values" value="200,400,600,800,1000" />
       </div>
+      <div class="form-group">
+        <label for="num-players">Number of Players</label>
+        <input type="number" id="num-players" value="2" min="1" max="8" />
+      </div>
+      <div id="player-names-container"></div>
       <div id="config-error" class="error-msg hidden"></div>
       <button class="btn btn-primary" id="btn-config-next">Next →</button>
     </div>
@@ -67,9 +72,15 @@
   <div id="screen-board" class="screen hidden">
     <div class="screen-header board-header">
       <button class="btn btn-back" id="btn-board-back">← Home</button>
-      <h2 id="board-title">Pooja-pardy!</h2>
+      <h2 id="board-title">Jeopardy!</h2>
     </div>
-    <div id="game-board"></div>
+    <div class="board-layout">
+      <div id="game-board"></div>
+      <div id="scoreboard">
+        <h3 class="scoreboard-title">Scores</h3>
+        <div id="scoreboard-players"></div>
+      </div>
+    </div>
   </div>
 
   <!-- LOAD SCREEN -->
@@ -79,6 +90,31 @@
       <h2>Load a Game</h2>
     </div>
     <div id="load-game-list" class="load-list"></div>
+  </div>
+
+  <!-- PLAYERS SCREEN (used when loading a saved game) -->
+  <div id="screen-players" class="screen hidden">
+    <div class="screen-header">
+      <button class="btn btn-back" id="btn-players-back">← Back</button>
+      <h2>Who's Playing?</h2>
+    </div>
+    <div class="form-container">
+      <div class="form-group">
+        <label for="num-players-load">Number of Players</label>
+        <input type="number" id="num-players-load" value="2" min="1" max="8" />
+      </div>
+      <div id="player-names-container-load"></div>
+      <button class="btn btn-primary" id="btn-players-start">Start Game →</button>
+    </div>
+  </div>
+
+  <!-- FINAL SCORES SCREEN -->
+  <div id="screen-final" class="screen hidden">
+    <div class="center-content">
+      <div id="final-winner-area"></div>
+      <div id="final-scores-list"></div>
+      <button class="btn btn-primary" id="btn-final-home">Back to Home</button>
+    </div>
   </div>
 
   <!-- QUESTION MODAL -->
@@ -94,6 +130,10 @@
       </div>
       <div id="modal-answer-area" class="modal-answer-area hidden">
         <p id="modal-answer" class="modal-answer-text"></p>
+      </div>
+      <div id="modal-attribution" class="modal-attribution hidden">
+        <p class="attribution-prompt">Who got it right?</p>
+        <div id="attribution-buttons"></div>
       </div>
       <div class="modal-actions">
         <button class="btn btn-primary" id="btn-show-answer">Show Answer</button>
