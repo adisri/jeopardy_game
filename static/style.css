@@ -662,3 +662,43 @@ body {
   font-weight: bold;
   color: #d4a017;
 }
+
+/* ===== RESUME BADGE (inline in game name) ===== */
+.resume-badge {
+  display: inline-block;
+  margin-left: 8px;
+  font-size: 0.65rem;
+  font-weight: bold;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: #060ce9;
+  background: #d4a017;
+  border-radius: 3px;
+  padding: 2px 6px;
+  vertical-align: middle;
+}
+
+/* ===== RESUME BANNER (Players screen) ===== */
+.resume-banner {
+  background: rgba(212, 160, 23, 0.12);
+  border: 1px solid rgba(212, 160, 23, 0.4);
+  border-radius: 6px;
+  padding: 14px 20px;
+  margin: 20px 24px 0;
+  max-width: 520px;
+  align-self: center;
+  width: calc(100% - 48px);
+}
+
+.resume-banner p {
+  font-size: 0.9rem;
+  color: rgba(255, 255, 255, 0.85);
+  line-height: 1.5;
+  margin: 0;
+}
+
+.resume-hint {
+  margin-top: 6px !important;
+  color: rgba(255, 255, 255, 0.5) !important;
+  font-size: 0.8rem !important;
+}

@@ -22,14 +22,24 @@ def init_db():
             )
         """)
         conn.commit()
+        try:
+            conn.execute("ALTER TABLE games ADD COLUMN game_state TEXT")
+            conn.commit()
+        except Exception:
+            pass  # Column already exists
 
 
 def list_games():
     with get_connection() as conn:
         rows = conn.execute(
-            "SELECT id, name, created_at FROM games ORDER BY created_at DESC"
+            "SELECT id, name, created_at, game_state FROM games ORDER BY created_at DESC"
         ).fetchall()
-        return [dict(row) for row in rows]
+        result = []
+        for row in rows:
+            d = dict(row)
+            d["has_state"] = d.pop("game_state") is not None
+            result.append(d)
+        return result
 
 
 def get_game(id: int):
@@ -40,7 +50,20 @@ def get_game(id: int):
         data = dict(row)
         data["config"] = json.loads(data["config"])
         data["categories"] = json.loads(data["categories"])
+        if data.get("game_state"):
+            data["game_state"] = json.loads(data["game_state"])
+        else:
+            data["game_state"] = None
         return data
+
+
+def update_game_state(game_id: int, state_dict: dict):
+    with get_connection() as conn:
+        conn.execute(
+            "UPDATE games SET game_state = ? WHERE id = ?",
+            (json.dumps(state_dict), game_id),
+        )
+        conn.commit()
 
 
 def create_game(name: str, config: dict, categories: list):

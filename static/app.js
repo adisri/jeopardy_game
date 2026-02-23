@@ -11,6 +11,8 @@ const state = {
   answeredCells: {},     // "catIdx-qIdx" → true
   scores: {},            // { 'Player 1': 0, 'Player 2': 0 }
   currentCell: null,     // {catIdx, qIdx} while modal open
+  gameId: null,          // int if saved game, null if ephemeral
+  pendingResume: null,   // { answeredCells, scores, players } from backend, cleared after use
 };
 
 // ===== API CLIENT =====
@@ -44,6 +46,16 @@ async function apiGetGame(id) {
 async function apiDeleteGame(id) {
   const res = await fetch(`/api/games/${id}`, { method: 'DELETE' });
   if (!res.ok) throw new Error('Failed to delete game');
+}
+
+async function apiSaveGameState(id, statePayload) {
+  const res = await fetch(`/api/games/${id}/state`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(statePayload),
+  });
+  if (!res.ok) throw new Error('Failed to save game state');
+  return res.json();
 }
 
 // ===== SCREEN NAVIGATION =====
@@ -238,10 +250,11 @@ function readSetupFormData() {
 
 // ===== BOARD =====
 function buildBoard() {
-  // Initialize scores from current player list
+  // Initialize scores from current player list, preserving any existing values
+  const existingScores = state.scores;
   state.scores = {};
   const players = state.config.players || [];
-  players.forEach(p => { state.scores[p] = 0; });
+  players.forEach(p => { state.scores[p] = existingScores[p] ?? 0; });
 
   const board = document.getElementById('game-board');
   board.innerHTML = '';
@@ -366,6 +379,15 @@ function closeModal(markAnswered, playerIdx = null) {
       updateScoreboard();
     }
 
+    // Auto-save progress for saved games
+    if (state.gameId !== null) {
+      apiSaveGameState(state.gameId, {
+        answeredCells: state.answeredCells,
+        scores: state.scores,
+        players: state.config.players,
+      }).catch(() => {}); // fire-and-forget; never block the UI
+    }
+
     // Update the board cell visually
     const board = document.getElementById('game-board');
     const numCat = state.categories.length;
@@ -445,9 +467,20 @@ function buildFinalScreen() {
 
 // ===== PLAYERS SCREEN (for loaded games) =====
 function initPlayersScreen() {
-  const numPlayers = (state.config.players && state.config.players.length) ? state.config.players.length : 2;
+  const savedPlayers = state.pendingResume ? state.pendingResume.players : null;
+  const playersToShow = (savedPlayers && savedPlayers.length > 0)
+    ? savedPlayers
+    : (state.config.players || []);
+  const numPlayers = playersToShow.length || 2;
   document.getElementById('num-players-load').value = numPlayers;
-  buildPlayerNameInputs('player-names-container-load', numPlayers, state.config.players || []);
+  buildPlayerNameInputs('player-names-container-load', numPlayers, playersToShow);
+
+  const banner = document.getElementById('resume-banner');
+  if (state.pendingResume) {
+    banner.classList.remove('hidden');
+  } else {
+    banner.classList.add('hidden');
+  }
 }
 
 // ===== LOAD SCREEN =====
@@ -475,6 +508,12 @@ async function loadGamesScreen() {
       const name = document.createElement('div');
       name.className = 'load-game-name';
       name.textContent = game.name;
+      if (game.has_state) {
+        const badge = document.createElement('span');
+        badge.className = 'resume-badge';
+        badge.textContent = 'Resume';
+        name.appendChild(badge);
+      }
 
       const date = document.createElement('div');
       date.className = 'load-game-date';
@@ -493,9 +532,10 @@ async function loadGamesScreen() {
       loadBtn.addEventListener('click', async () => {
         try {
           const fullGame = await apiGetGame(game.id);
+          state.gameId = fullGame.id;
           state.config = fullGame.config;
           state.categories = fullGame.categories;
-          state.answeredCells = {};
+          state.pendingResume = fullGame.game_state || null;
           initPlayersScreen();
           showScreen('players');
         } catch (e) {
@@ -584,6 +624,7 @@ document.getElementById('btn-start-without-saving').addEventListener('click', ()
   }
   hideError('setup-error');
   state.categories = categories;
+  state.gameId = null;
   state.answeredCells = {};
   buildBoard();
   showScreen('board');
@@ -606,11 +647,12 @@ document.getElementById('btn-save-and-start').addEventListener('click', async ()
   state.categories = categories;
 
   try {
-    await apiCreateGame({
+    const saved = await apiCreateGame({
       name: gameName,
       config: state.config,
       categories: state.categories,
     });
+    state.gameId = saved.id;
   } catch (e) {
     if (e.status === 409) {
       showError('setup-error', `A game named "${gameName}" already exists. Choose a different name.`);
@@ -626,7 +668,10 @@ document.getElementById('btn-save-and-start').addEventListener('click', async ()
 });
 
 // Board
-document.getElementById('btn-board-back').addEventListener('click', () => showScreen('landing'));
+document.getElementById('btn-board-back').addEventListener('click', () => {
+  state.gameId = null;
+  showScreen('landing');
+});
 
 // Modal
 document.getElementById('btn-show-answer').addEventListener('click', () => {
@@ -669,13 +714,26 @@ document.getElementById('btn-players-start').addEventListener('click', () => {
     players.push(input.value.trim() || `Player ${i + 1}`);
   });
   state.config.players = players;
-  state.answeredCells = {};
+
+  if (state.pendingResume) {
+    state.answeredCells = state.pendingResume.answeredCells || {};
+    state.scores = state.pendingResume.scores || {};
+    // buildBoard() will use ?? 0 for any players not in saved scores
+  } else {
+    state.answeredCells = {};
+    state.scores = {};
+  }
+  state.pendingResume = null;
+
   buildBoard();
   showScreen('board');
 });
 
 // Final screen
-document.getElementById('btn-final-home').addEventListener('click', () => showScreen('landing'));
+document.getElementById('btn-final-home').addEventListener('click', () => {
+  state.gameId = null;
+  showScreen('landing');
+});
 
 // Load
 document.getElementById('btn-load-back').addEventListener('click', () => showScreen('landing'));
