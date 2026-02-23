@@ -616,20 +616,6 @@ document.getElementById('btn-setup-back').addEventListener('click', () => {
   showScreen('config');
 });
 
-document.getElementById('btn-start-without-saving').addEventListener('click', () => {
-  const { valid, categories, errors } = readSetupFormData();
-  if (!valid) {
-    showError('setup-error', errors[0]);
-    return;
-  }
-  hideError('setup-error');
-  state.categories = categories;
-  state.gameId = null;
-  state.answeredCells = {};
-  buildBoard();
-  showScreen('board');
-});
-
 document.getElementById('btn-save-and-start').addEventListener('click', async () => {
   const { valid, categories, errors } = readSetupFormData();
   if (!valid) {
