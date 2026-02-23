@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Pooja-pardy!</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+
+  <!-- LANDING SCREEN -->
+  <div id="screen-landing" class="screen">
+    <div class="center-content">
+      <h1 class="title">Pooja-pardy!</h1>
+      <div class="landing-buttons">
+        <button class="btn btn-primary" id="btn-new-game">New Game</button>
+        <button class="btn btn-secondary" id="btn-load-game">Load Game</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- CONFIG SCREEN -->
+  <div id="screen-config" class="screen hidden">
+    <div class="screen-header">
+      <button class="btn btn-back" id="btn-config-back">← Back</button>
+      <h2>Game Setup</h2>
+    </div>
+    <div class="form-container">
+      <div class="form-group">
+        <label for="game-name">Game Name (optional)</label>
+        <input type="text" id="game-name" placeholder="e.g. Pooja's Birthday Bash" />
+      </div>
+      <div class="form-group">
+        <label for="num-categories">Number of Categories</label>
+        <input type="number" id="num-categories" value="6" min="1" max="10" />
+      </div>
+      <div class="form-group">
+        <label for="num-questions">Questions per Category</label>
+        <input type="number" id="num-questions" value="5" min="1" max="10" />
+      </div>
+      <div class="form-group">
+        <label for="point-values">Point Values (comma-separated)</label>
+        <input type="text" id="point-values" value="200,400,600,800,1000" />
+      </div>
+      <div id="config-error" class="error-msg hidden"></div>
+      <button class="btn btn-primary" id="btn-config-next">Next →</button>
+    </div>
+  </div>
+
+  <!-- SETUP SCREEN -->
+  <div id="screen-setup" class="screen hidden">
+    <div class="screen-header">
+      <button class="btn btn-back" id="btn-setup-back">← Back</button>
+      <h2>Enter Questions &amp; Answers</h2>
+    </div>
+    <div id="categories-container"></div>
+    <div class="setup-actions">
+      <div id="setup-error" class="error-msg hidden"></div>
+      <div class="setup-buttons">
+        <button class="btn btn-secondary" id="btn-start-without-saving">Start Without Saving</button>
+        <button class="btn btn-primary" id="btn-save-and-start">Save &amp; Start Game</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- BOARD SCREEN -->
+  <div id="screen-board" class="screen hidden">
+    <div class="screen-header board-header">
+      <button class="btn btn-back" id="btn-board-back">← Home</button>
+      <h2 id="board-title">Pooja-pardy!</h2>
+    </div>
+    <div id="game-board"></div>
+  </div>
+
+  <!-- LOAD SCREEN -->
+  <div id="screen-load" class="screen hidden">
+    <div class="screen-header">
+      <button class="btn btn-back" id="btn-load-back">← Back</button>
+      <h2>Load a Game</h2>
+    </div>
+    <div id="load-game-list" class="load-list"></div>
+  </div>
+
+  <!-- QUESTION MODAL -->
+  <div id="question-modal" class="modal hidden" role="dialog" aria-modal="true">
+    <div class="modal-backdrop" id="modal-backdrop"></div>
+    <div class="modal-box">
+      <div class="modal-meta">
+        <span id="modal-category" class="modal-category-label"></span>
+        <span id="modal-value" class="modal-value-label"></span>
+      </div>
+      <div class="modal-question-area">
+        <p id="modal-question" class="modal-question-text"></p>
+      </div>
+      <div id="modal-answer-area" class="modal-answer-area hidden">
+        <p id="modal-answer" class="modal-answer-text"></p>
+      </div>
+      <div class="modal-actions">
+        <button class="btn btn-primary" id="btn-show-answer">Show Answer</button>
+        <button class="btn btn-secondary" id="btn-close-modal">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
