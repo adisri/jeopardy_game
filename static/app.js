@@ -7,10 +7,10 @@ const state = {
     pointValues: [200, 400, 600, 800, 1000],
     players: ['Player 1', 'Player 2'],
   },
-  categories: [],        // [{name, questions: [{question, answer, points}]}]
+  categories: [],        // [{name, questions: [{question, answer, points, dailyDouble}]}]
   answeredCells: {},     // "catIdx-qIdx" → true
   scores: {},            // { 'Player 1': 0, 'Player 2': 0 }
-  currentCell: null,     // {catIdx, qIdx} while modal open
+  currentCell: null,     // {catIdx, qIdx, ddPlayerIdx: null|int, ddWager: null|int}
   gameId: null,          // int if saved game, null if ephemeral
   pendingResume: null,   // { answeredCells, scores, players } from backend, cleared after use
 };
@@ -127,8 +127,8 @@ function validateAndAdvanceConfig() {
     return;
   }
 
-  if (isNaN(numPlayers) || numPlayers < 1 || numPlayers > 8) {
-    showError('config-error', 'Number of players must be between 1 and 8.');
+  if (isNaN(numPlayers) || numPlayers < 2 || numPlayers > 8) {
+    showError('config-error', 'Number of players must be between 2 and 8.');
     return;
   }
 
@@ -174,10 +174,10 @@ function buildSetupScreen() {
     nameRow.appendChild(nameInput);
     block.appendChild(nameRow);
 
-    // Column headers for Q/A
+    // Column headers for Q/A/DD
     const headers = document.createElement('div');
     headers.className = 'qa-headers';
-    ['Points', 'Question', 'Answer'].forEach(t => {
+    ['Points', 'Question', 'Answer', 'DD'].forEach(t => {
       const s = document.createElement('span');
       s.textContent = t;
       headers.appendChild(s);
@@ -215,6 +215,17 @@ function buildSetupScreen() {
       }
       row.appendChild(aInput);
 
+      const ddCell = document.createElement('div');
+      ddCell.className = 'dd-checkbox-cell';
+      const ddCheckbox = document.createElement('input');
+      ddCheckbox.type = 'checkbox';
+      ddCheckbox.dataset.cat = c;
+      ddCheckbox.dataset.q = q;
+      ddCheckbox.dataset.field = 'dailyDouble';
+      if (state.categories[c]?.questions[q]?.dailyDouble) ddCheckbox.checked = true;
+      ddCell.appendChild(ddCheckbox);
+      row.appendChild(ddCell);
+
       block.appendChild(row);
     }
 
@@ -236,11 +247,13 @@ function readSetupFormData() {
     for (let q = 0; q < numQuestions; q++) {
       const qInput = document.querySelector(`input[data-cat="${c}"][data-q="${q}"][data-field="question"]`);
       const aInput = document.querySelector(`input[data-cat="${c}"][data-q="${q}"][data-field="answer"]`);
+      const ddInput = document.querySelector(`input[data-cat="${c}"][data-q="${q}"][data-field="dailyDouble"]`);
       const question = qInput ? qInput.value.trim() : '';
       const answer = aInput ? aInput.value.trim() : '';
+      const dailyDouble = ddInput ? ddInput.checked : false;
       if (!question) errors.push(`Category ${c + 1}, $${pointValues[q]}: question is blank.`);
       if (!answer) errors.push(`Category ${c + 1}, $${pointValues[q]}: answer is blank.`);
-      questions.push({ question, answer, points: pointValues[q] });
+      questions.push({ question, answer, points: pointValues[q], dailyDouble });
     }
     categories.push({ name: catName, questions });
   }
@@ -329,26 +342,129 @@ function updateScoreboard() {
 function openQuestion(catIdx, qIdx) {
   const cat = state.categories[catIdx];
   const q = cat.questions[qIdx];
-  state.currentCell = { catIdx, qIdx };
+  state.currentCell = { catIdx, qIdx, ddPlayerIdx: null, ddWager: null };
 
   document.getElementById('modal-category').textContent = cat.name;
-  document.getElementById('modal-value').textContent = `$${q.points}`;
+  document.getElementById('question-modal').classList.remove('hidden');
+
+  if (q.dailyDouble) {
+    // DD: show player-selection step, hide everything else
+    document.getElementById('modal-value').textContent = 'Daily Double!';
+    document.getElementById('modal-question-area').classList.add('hidden');
+    document.getElementById('modal-answer-area').classList.add('hidden');
+    document.getElementById('modal-attribution').classList.add('hidden');
+    document.getElementById('btn-show-answer').classList.add('hidden');
+    document.getElementById('btn-close-modal').classList.remove('hidden');
+    document.getElementById('modal-dd-wager-step').classList.add('hidden');
+    // Build player buttons for DD step 1
+    const btnContainer = document.getElementById('dd-player-buttons');
+    btnContainer.innerHTML = '';
+    (state.config.players || []).forEach((player, idx) => {
+      const btn = document.createElement('button');
+      btn.className = 'btn btn-secondary btn-attribution';
+      btn.textContent = player;
+      btn.addEventListener('click', () => selectDDPlayer(idx));
+      btnContainer.appendChild(btn);
+    });
+    document.getElementById('modal-dd-player-step').classList.remove('hidden');
+  } else {
+    // Normal flow
+    document.getElementById('modal-value').textContent = `$${q.points}`;
+    document.getElementById('modal-question').textContent = q.question;
+    document.getElementById('modal-answer').textContent = q.answer;
+    document.getElementById('modal-answer-area').classList.add('hidden');
+    document.getElementById('modal-attribution').classList.add('hidden');
+    document.getElementById('attribution-buttons').innerHTML = '';
+    document.getElementById('btn-show-answer').classList.remove('hidden');
+    document.getElementById('btn-close-modal').classList.remove('hidden');
+    document.getElementById('modal-dd-player-step').classList.add('hidden');
+    document.getElementById('modal-dd-wager-step').classList.add('hidden');
+    document.getElementById('modal-question-area').classList.remove('hidden');
+  }
+}
+
+function selectDDPlayer(playerIdx) {
+  state.currentCell.ddPlayerIdx = playerIdx;
+  const player = state.config.players[playerIdx];
+  const playerScore = state.scores[player] || 0;
+  const maxPointValue = Math.max(...state.config.pointValues);
+  const maxWager = Math.max(playerScore, maxPointValue);
+
+  document.getElementById('modal-dd-player-step').classList.add('hidden');
+  document.getElementById('dd-wager-hint').textContent =
+    `Max wager: $${maxWager} (your score: $${playerScore})`;
+  document.getElementById('dd-wager-input').value = '';
+  document.getElementById('dd-wager-input').max = maxWager;
+  document.getElementById('dd-wager-error').classList.add('hidden');
+  document.getElementById('modal-dd-wager-step').classList.remove('hidden');
+}
+
+function confirmDDWager() {
+  const { ddPlayerIdx } = state.currentCell;
+  const player = state.config.players[ddPlayerIdx];
+  const playerScore = state.scores[player] || 0;
+  const maxPointValue = Math.max(...state.config.pointValues);
+  const maxWager = Math.max(playerScore, maxPointValue);
+
+  const raw = parseInt(document.getElementById('dd-wager-input').value, 10);
+  if (isNaN(raw) || raw < 1) {
+    document.getElementById('dd-wager-error').textContent = 'Enter a wager of at least $1.';
+    document.getElementById('dd-wager-error').classList.remove('hidden');
+    return;
+  }
+  if (raw > maxWager) {
+    document.getElementById('dd-wager-error').textContent = `Wager cannot exceed $${maxWager}.`;
+    document.getElementById('dd-wager-error').classList.remove('hidden');
+    return;
+  }
+
+  state.currentCell.ddWager = raw;
+
+  // Reveal the question
+  const { catIdx, qIdx } = state.currentCell;
+  const q = state.categories[catIdx].questions[qIdx];
+  document.getElementById('modal-value').textContent = `$${raw} wagered`;
   document.getElementById('modal-question').textContent = q.question;
   document.getElementById('modal-answer').textContent = q.answer;
 
+  document.getElementById('modal-dd-wager-step').classList.add('hidden');
+  document.getElementById('modal-question-area').classList.remove('hidden');
   document.getElementById('modal-answer-area').classList.add('hidden');
   document.getElementById('modal-attribution').classList.add('hidden');
-  document.getElementById('attribution-buttons').innerHTML = '';
   document.getElementById('btn-show-answer').classList.remove('hidden');
   document.getElementById('btn-close-modal').classList.remove('hidden');
-
-  document.getElementById('question-modal').classList.remove('hidden');
 }
 
 function buildAttributionButtons() {
   const container = document.getElementById('attribution-buttons');
   container.innerHTML = '';
 
+  const { ddPlayerIdx, ddWager } = state.currentCell || {};
+
+  const prompt = container.closest('#modal-attribution').querySelector('.attribution-prompt');
+  if (prompt) {
+    prompt.textContent = (ddPlayerIdx !== null && ddPlayerIdx !== undefined && ddWager !== null)
+      ? 'Correct or Incorrect?'
+      : 'Who got it right?';
+  }
+
+  if (ddPlayerIdx !== null && ddPlayerIdx !== undefined && ddWager !== null) {
+    // DD: Correct / Incorrect
+    const correctBtn = document.createElement('button');
+    correctBtn.className = 'btn btn-secondary btn-attribution';
+    correctBtn.textContent = 'Correct';
+    correctBtn.addEventListener('click', () => closeModal(true, ddPlayerIdx, +ddWager));
+    container.appendChild(correctBtn);
+
+    const incorrectBtn = document.createElement('button');
+    incorrectBtn.className = 'btn btn-ghost btn-attribution';
+    incorrectBtn.textContent = 'Incorrect';
+    incorrectBtn.addEventListener('click', () => closeModal(true, ddPlayerIdx, -ddWager));
+    container.appendChild(incorrectBtn);
+    return;
+  }
+
+  // Normal: player name buttons + Nobody
   const players = state.config.players || [];
   players.forEach((player, idx) => {
     const btn = document.createElement('button');
@@ -357,7 +473,6 @@ function buildAttributionButtons() {
     btn.addEventListener('click', () => closeModal(true, idx));
     container.appendChild(btn);
   });
-
   const nobodyBtn = document.createElement('button');
   nobodyBtn.className = 'btn btn-ghost btn-attribution';
   nobodyBtn.textContent = 'Nobody';
@@ -365,17 +480,19 @@ function buildAttributionButtons() {
   container.appendChild(nobodyBtn);
 }
 
-function closeModal(markAnswered, playerIdx = null) {
+function closeModal(markAnswered, playerIdx = null, scoreDelta = null) {
   if (markAnswered && state.currentCell) {
     const { catIdx, qIdx } = state.currentCell;
     const key = `${catIdx}-${qIdx}`;
     state.answeredCells[key] = true;
 
-    // Award points to the player who got it right
     if (playerIdx !== null) {
       const player = state.config.players[playerIdx];
-      const points = state.categories[catIdx].questions[qIdx].points;
-      state.scores[player] = (state.scores[player] || 0) + points;
+      // Use scoreDelta if provided (DD), else use question's points (normal)
+      const delta = scoreDelta !== null
+        ? scoreDelta
+        : state.categories[catIdx].questions[qIdx].points;
+      state.scores[player] = (state.scores[player] || 0) + delta;
       updateScoreboard();
     }
 
@@ -602,7 +719,7 @@ document.getElementById('btn-config-next').addEventListener('click', validateAnd
 
 document.getElementById('num-players').addEventListener('input', () => {
   const count = parseInt(document.getElementById('num-players').value, 10);
-  if (!isNaN(count) && count >= 1 && count <= 8) {
+  if (!isNaN(count) && count >= 2 && count <= 8) {
     const existing = Array.from(
       document.querySelectorAll('#player-names-container input[data-player-idx]')
     ).map(inp => inp.value);
@@ -672,6 +789,8 @@ document.getElementById('btn-close-modal').addEventListener('click', () => close
 
 document.getElementById('modal-backdrop').addEventListener('click', () => closeModal(false));
 
+document.getElementById('btn-dd-reveal').addEventListener('click', confirmDDWager);
+
 document.addEventListener('keydown', (e) => {
   if (e.key === 'Escape') {
     const modal = document.getElementById('question-modal');
@@ -686,7 +805,7 @@ document.getElementById('btn-players-back').addEventListener('click', () => show
 
 document.getElementById('num-players-load').addEventListener('input', () => {
   const count = parseInt(document.getElementById('num-players-load').value, 10);
-  if (!isNaN(count) && count >= 1 && count <= 8) {
+  if (!isNaN(count) && count >= 2 && count <= 8) {
     const existing = Array.from(
       document.querySelectorAll('#player-names-container-load input[data-player-idx]')
     ).map(inp => inp.value);
@@ -699,6 +818,10 @@ document.getElementById('btn-players-start').addEventListener('click', () => {
   document.querySelectorAll('#player-names-container-load input[data-player-idx]').forEach((input, i) => {
     players.push(input.value.trim() || `Player ${i + 1}`);
   });
+  if (players.length < 2) {
+    alert('At least 2 players are required.');
+    return;
+  }
   state.config.players = players;
 
   if (state.pendingResume) {

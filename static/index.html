@@ -44,7 +44,7 @@
       </div>
       <div class="form-group">
         <label for="num-players">Number of Players</label>
-        <input type="number" id="num-players" value="2" min="1" max="8" />
+        <input type="number" id="num-players" value="2" min="2" max="8" />
       </div>
       <div id="player-names-container"></div>
       <div id="config-error" class="error-msg hidden"></div>
@@ -104,7 +104,7 @@
     <div class="form-container">
       <div class="form-group">
         <label for="num-players-load">Number of Players</label>
-        <input type="number" id="num-players-load" value="2" min="1" max="8" />
+        <input type="number" id="num-players-load" value="2" min="2" max="8" />
       </div>
       <div id="player-names-container-load"></div>
       <button class="btn btn-primary" id="btn-players-start">Start Game →</button>
@@ -128,7 +128,26 @@
         <span id="modal-category" class="modal-category-label"></span>
         <span id="modal-value" class="modal-value-label"></span>
       </div>
-      <div class="modal-question-area">
+
+      <!-- DD Step 1: Who is wagering? -->
+      <div id="modal-dd-player-step" class="modal-dd-step hidden">
+        <p class="dd-step-prompt">Who is wagering?</p>
+        <div id="dd-player-buttons"></div>
+      </div>
+
+      <!-- DD Step 2: Wager input -->
+      <div id="modal-dd-wager-step" class="modal-dd-step hidden">
+        <p class="dd-step-prompt">Enter your wager</p>
+        <p id="dd-wager-hint" class="dd-wager-hint"></p>
+        <div class="dd-wager-row">
+          <span class="dd-dollar">$</span>
+          <input type="number" id="dd-wager-input" min="1" placeholder="0" />
+        </div>
+        <div id="dd-wager-error" class="error-msg hidden"></div>
+        <button class="btn btn-primary" id="btn-dd-reveal">Reveal Question →</button>
+      </div>
+
+      <div id="modal-question-area" class="modal-question-area">
         <p id="modal-question" class="modal-question-text"></p>
       </div>
       <div id="modal-answer-area" class="modal-answer-area hidden">
