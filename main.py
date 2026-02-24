@@ -1,5 +1,5 @@
 from contextlib import asynccontextmanager
-from sqlite3 import IntegrityError
+from psycopg2.errors import UniqueViolation
 
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import FileResponse
@@ -39,7 +39,7 @@ def list_games():
 def create_game(payload: CreateGameRequest):
     try:
         return database.create_game(payload.name, payload.config, payload.categories)
-    except IntegrityError:
+    except UniqueViolation:
         raise HTTPException(status_code=409, detail="A game with that name already exists.")
 
 

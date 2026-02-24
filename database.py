@@ -1,50 +1,57 @@
-import sqlite3
 import json
+import os
 
-DB_PATH = "games.db"
+import psycopg2
+import psycopg2.extras
 
 
 def get_connection():
-    conn = sqlite3.connect(DB_PATH)
-    conn.row_factory = sqlite3.Row
-    return conn
+    return psycopg2.connect(os.environ["DATABASE_URL"])
 
 
 def init_db():
-    with get_connection() as conn:
-        conn.execute("""
-            CREATE TABLE IF NOT EXISTS games (
-                id          INTEGER PRIMARY KEY AUTOINCREMENT,
-                name        TEXT    NOT NULL UNIQUE,
-                config      TEXT    NOT NULL,
-                categories  TEXT    NOT NULL,
-                created_at  TIMESTAMP NOT NULL DEFAULT (datetime('now'))
-            )
-        """)
+    conn = get_connection()
+    try:
+        with conn.cursor() as cur:
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS games (
+                    id          SERIAL PRIMARY KEY,
+                    name        TEXT      NOT NULL UNIQUE,
+                    config      TEXT      NOT NULL,
+                    categories  TEXT      NOT NULL,
+                    game_state  TEXT,
+                    created_at  TIMESTAMP NOT NULL DEFAULT NOW()
+                )
+            """)
         conn.commit()
-        try:
-            conn.execute("ALTER TABLE games ADD COLUMN game_state TEXT")
-            conn.commit()
-        except Exception:
-            pass  # Column already exists
+    finally:
+        conn.close()
 
 
 def list_games():
-    with get_connection() as conn:
-        rows = conn.execute(
-            "SELECT id, name, created_at, game_state FROM games ORDER BY created_at DESC"
-        ).fetchall()
+    conn = get_connection()
+    try:
+        with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+            cur.execute(
+                "SELECT id, name, created_at, game_state FROM games ORDER BY created_at DESC"
+            )
+            rows = cur.fetchall()
         result = []
         for row in rows:
             d = dict(row)
             d["has_state"] = d.pop("game_state") is not None
             result.append(d)
         return result
+    finally:
+        conn.close()
 
 
 def get_game(id: int):
-    with get_connection() as conn:
-        row = conn.execute("SELECT * FROM games WHERE id = ?", (id,)).fetchone()
+    conn = get_connection()
+    try:
+        with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+            cur.execute("SELECT * FROM games WHERE id = %s", (id,))
+            row = cur.fetchone()
         if row is None:
             return None
         data = dict(row)
@@ -55,29 +62,45 @@ def get_game(id: int):
         else:
             data["game_state"] = None
         return data
+    finally:
+        conn.close()
 
 
 def update_game_state(game_id: int, state_dict: dict):
-    with get_connection() as conn:
-        conn.execute(
-            "UPDATE games SET game_state = ? WHERE id = ?",
-            (json.dumps(state_dict), game_id),
-        )
+    conn = get_connection()
+    try:
+        with conn.cursor() as cur:
+            cur.execute(
+                "UPDATE games SET game_state = %s WHERE id = %s",
+                (json.dumps(state_dict), game_id),
+            )
         conn.commit()
+    finally:
+        conn.close()
 
 
 def create_game(name: str, config: dict, categories: list):
-    with get_connection() as conn:
-        cursor = conn.execute(
-            "INSERT INTO games (name, config, categories) VALUES (?, ?, ?)",
-            (name, json.dumps(config), json.dumps(categories)),
-        )
+    conn = get_connection()
+    try:
+        with conn.cursor() as cur:
+            cur.execute(
+                "INSERT INTO games (name, config, categories) VALUES (%s, %s, %s) RETURNING id",
+                (name, json.dumps(config), json.dumps(categories)),
+            )
+            row = cur.fetchone()
         conn.commit()
-        return {"id": cursor.lastrowid, "name": name}
+        return {"id": row[0], "name": name}
+    finally:
+        conn.close()
 
 
 def delete_game(id: int) -> bool:
-    with get_connection() as conn:
-        cursor = conn.execute("DELETE FROM games WHERE id = ?", (id,))
+    conn = get_connection()
+    try:
+        with conn.cursor() as cur:
+            cur.execute("DELETE FROM games WHERE id = %s", (id,))
+            deleted = cur.rowcount > 0
         conn.commit()
-        return cursor.rowcount > 0
+        return deleted
+    finally:
+        conn.close()
