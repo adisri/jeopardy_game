@@ -774,3 +774,33 @@ body {
   gap: 8px;
   justify-content: center;
 }
+
+/* ===== ANSWER CELL: stack text input above image-upload row ===== */
+.answer-cell { display: flex; flex-direction: column; gap: 6px; }
+.answer-cell > input[type="text"] { width: 100%; }
+
+/* Image upload row */
+.answer-img-row { display: flex; align-items: center; gap: 6px; }
+.answer-img-file-input { display: none; }
+.btn-attach-img {
+  font-size: 0.7rem; color: rgba(255,255,255,0.55);
+  border: 1px dashed rgba(255,255,255,0.3); border-radius: 3px;
+  padding: 2px 6px; cursor: pointer; white-space: nowrap; user-select: none;
+}
+.btn-attach-img:hover { color: #d4a017; border-color: rgba(212,160,23,0.6); }
+.answer-img-thumb {
+  width: 36px; height: 27px; object-fit: cover;
+  border-radius: 2px; border: 1px solid rgba(212,160,23,0.5); flex-shrink: 0;
+}
+.btn-remove-img {
+  background: none; border: none; color: rgba(255,107,107,0.7);
+  font-size: 0.75rem; cursor: pointer; padding: 0 2px;
+}
+.btn-remove-img:hover { color: #ff6b6b; }
+
+/* Modal answer image */
+.modal-answer-img {
+  display: block; max-width: 100%; max-height: 300px;
+  margin: 0 auto 12px; border-radius: 4px; object-fit: contain;
+  border: 1px solid rgba(212,160,23,0.4);
+}

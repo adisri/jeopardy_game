@@ -143,6 +143,29 @@ function validateAndAdvanceConfig() {
   showScreen('setup');
 }
 
+// ===== IMAGE HELPER =====
+function resizeImageToBase64(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onerror = () => reject(new Error('Failed to read file'));
+    reader.onload = (e) => {
+      const img = new Image();
+      img.onerror = () => reject(new Error('Failed to decode image'));
+      img.onload = () => {
+        const scale = Math.min(1, 800 / img.width, 600 / img.height);
+        const w = Math.round(img.width * scale);
+        const h = Math.round(img.height * scale);
+        const canvas = document.createElement('canvas');
+        canvas.width = w; canvas.height = h;
+        canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+        resolve(canvas.toDataURL('image/jpeg', 0.8));
+      };
+      img.src = e.target.result;
+    };
+    reader.readAsDataURL(file);
+  });
+}
+
 // ===== SETUP SCREEN =====
 function buildSetupScreen() {
   const container = document.getElementById('categories-container');
@@ -204,6 +227,9 @@ function buildSetupScreen() {
       }
       row.appendChild(qInput);
 
+      const answerCell = document.createElement('div');
+      answerCell.className = 'answer-cell';
+
       const aInput = document.createElement('input');
       aInput.type = 'text';
       aInput.placeholder = 'Answer';
@@ -213,7 +239,75 @@ function buildSetupScreen() {
       if (state.categories[c] && state.categories[c].questions[q]) {
         aInput.value = state.categories[c].questions[q].answer || '';
       }
-      row.appendChild(aInput);
+      answerCell.appendChild(aInput);
+
+      // Image upload row
+      const imgRow = document.createElement('div');
+      imgRow.className = 'answer-img-row';
+
+      const fileInput = document.createElement('input');
+      fileInput.type = 'file';
+      fileInput.accept = 'image/*';
+      fileInput.className = 'answer-img-file-input';
+
+      const attachLabel = document.createElement('label');
+      attachLabel.className = 'btn-attach-img';
+      attachLabel.textContent = '+ Image';
+      attachLabel.appendChild(fileInput);
+
+      const thumb = document.createElement('img');
+      thumb.className = 'answer-img-thumb hidden';
+      thumb.alt = '';
+
+      const removeBtn = document.createElement('button');
+      removeBtn.type = 'button';
+      removeBtn.className = 'btn-remove-img hidden';
+      removeBtn.textContent = '✕';
+
+      const hiddenInput = document.createElement('input');
+      hiddenInput.type = 'hidden';
+      hiddenInput.dataset.cat = c;
+      hiddenInput.dataset.q = q;
+      hiddenInput.dataset.field = 'imageData';
+
+      // Restore saved image if present
+      const savedImage = state.categories[c]?.questions[q]?.image;
+      if (savedImage) {
+        hiddenInput.value = savedImage;
+        thumb.src = savedImage;
+        thumb.classList.remove('hidden');
+        removeBtn.classList.remove('hidden');
+      }
+
+      fileInput.addEventListener('change', async () => {
+        const file = fileInput.files[0];
+        if (!file) return;
+        try {
+          const dataUrl = await resizeImageToBase64(file);
+          hiddenInput.value = dataUrl;
+          thumb.src = dataUrl;
+          thumb.classList.remove('hidden');
+          removeBtn.classList.remove('hidden');
+        } catch (e) {
+          alert('Failed to load image: ' + e.message);
+        }
+        fileInput.value = '';
+      });
+
+      removeBtn.addEventListener('click', () => {
+        hiddenInput.value = '';
+        thumb.src = '';
+        thumb.classList.add('hidden');
+        removeBtn.classList.add('hidden');
+      });
+
+      imgRow.appendChild(attachLabel);
+      imgRow.appendChild(thumb);
+      imgRow.appendChild(removeBtn);
+      imgRow.appendChild(hiddenInput);
+      answerCell.appendChild(imgRow);
+
+      row.appendChild(answerCell);
 
       const ddCell = document.createElement('div');
       ddCell.className = 'dd-checkbox-cell';
@@ -248,12 +342,14 @@ function readSetupFormData() {
       const qInput = document.querySelector(`input[data-cat="${c}"][data-q="${q}"][data-field="question"]`);
       const aInput = document.querySelector(`input[data-cat="${c}"][data-q="${q}"][data-field="answer"]`);
       const ddInput = document.querySelector(`input[data-cat="${c}"][data-q="${q}"][data-field="dailyDouble"]`);
+      const imageInput = document.querySelector(`input[data-cat="${c}"][data-q="${q}"][data-field="imageData"]`);
       const question = qInput ? qInput.value.trim() : '';
       const answer = aInput ? aInput.value.trim() : '';
       const dailyDouble = ddInput ? ddInput.checked : false;
+      const image = imageInput?.value || null;
       if (!question) errors.push(`Category ${c + 1}, $${pointValues[q]}: question is blank.`);
       if (!answer) errors.push(`Category ${c + 1}, $${pointValues[q]}: answer is blank.`);
-      questions.push({ question, answer, points: pointValues[q], dailyDouble });
+      questions.push({ question, answer, points: pointValues[q], dailyDouble, image });
     }
     categories.push({ name: catName, questions });
   }
@@ -372,6 +468,14 @@ function openQuestion(catIdx, qIdx) {
     document.getElementById('modal-value').textContent = `$${q.points}`;
     document.getElementById('modal-question').textContent = q.question;
     document.getElementById('modal-answer').textContent = q.answer;
+    const modalAnswerImg = document.getElementById('modal-answer-img');
+    if (q.image) {
+      modalAnswerImg.src = q.image;
+      modalAnswerImg.classList.remove('hidden');
+    } else {
+      modalAnswerImg.src = '';
+      modalAnswerImg.classList.add('hidden');
+    }
     document.getElementById('modal-answer-area').classList.add('hidden');
     document.getElementById('modal-attribution').classList.add('hidden');
     document.getElementById('attribution-buttons').innerHTML = '';
@@ -426,6 +530,14 @@ function confirmDDWager() {
   document.getElementById('modal-value').textContent = `$${raw} wagered`;
   document.getElementById('modal-question').textContent = q.question;
   document.getElementById('modal-answer').textContent = q.answer;
+  const modalAnswerImg = document.getElementById('modal-answer-img');
+  if (q.image) {
+    modalAnswerImg.src = q.image;
+    modalAnswerImg.classList.remove('hidden');
+  } else {
+    modalAnswerImg.src = '';
+    modalAnswerImg.classList.add('hidden');
+  }
 
   document.getElementById('modal-dd-wager-step').classList.add('hidden');
   document.getElementById('modal-question-area').classList.remove('hidden');
