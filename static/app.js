@@ -659,25 +659,37 @@ function buildFinalScreen() {
 
   if (sorted.length === 0) return;
 
-  const winner = sorted[0];
-  const winnerScore = state.scores[winner] || 0;
+  const topScore = state.scores[sorted[0]] || 0;
+  const winners = sorted.filter(p => (state.scores[p] || 0) === topScore);
+  const isTie = winners.length > 1;
 
-  winnerArea.innerHTML = `
-    <div class="final-winner">
-      <div class="final-crown">👑</div>
-      <div class="final-winner-name">${winner}</div>
-      <div class="final-winner-score">$${winnerScore}</div>
-    </div>
-  `;
+  if (isTie) {
+    winnerArea.innerHTML = `
+      <div class="final-winner">
+        <div class="final-crown">🤝</div>
+        <div class="final-winner-name">It's a Tie!</div>
+        <div class="final-tie-names">${winners.join(' &amp; ')}</div>
+        <div class="final-winner-score">$${topScore}</div>
+      </div>
+    `;
+  } else {
+    winnerArea.innerHTML = `
+      <div class="final-winner">
+        <div class="final-crown">👑</div>
+        <div class="final-winner-name">${sorted[0]}</div>
+        <div class="final-winner-score">$${topScore}</div>
+      </div>
+    `;
+  }
 
-  sorted.slice(1).forEach((player, i) => {
+  sorted.slice(isTie ? winners.length : 1).forEach((player, i) => {
     const score = state.scores[player] || 0;
     const row = document.createElement('div');
     row.className = 'final-rank-row';
 
     const rank = document.createElement('span');
     rank.className = 'final-rank-number';
-    rank.textContent = `#${i + 2}`;
+    rank.textContent = `#${i + (isTie ? winners.length : 2)}`;
 
     const name = document.createElement('span');
     name.className = 'final-rank-name';

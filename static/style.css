@@ -628,6 +628,12 @@ body {
   margin-top: 4px;
 }
 
+.final-tie-names {
+  font-size: clamp(1rem, 3vw, 1.5rem);
+  color: #fff;
+  margin-top: 4px;
+}
+
 #final-scores-list {
   width: 100%;
   max-width: 400px;
