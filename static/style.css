@@ -7,7 +7,7 @@
 
 body {
   font-family: 'Georgia', 'Times New Roman', serif;
-  background: #060ce9;
+  background: radial-gradient(ellipse at top, #1e35f0 0%, #1428e8 60%, #0f20d4 100%);
   color: #fff;
   min-height: 100vh;
 }
@@ -29,7 +29,7 @@ body {
   align-items: center;
   gap: 16px;
   padding: 16px 24px;
-  background: #040999;
+  background: #0d1ec7;
   border-bottom: 3px solid #d4a017;
 }
 
@@ -96,12 +96,12 @@ body {
 }
 
 .btn-primary {
-  background: #d4a017;
+  background: linear-gradient(to bottom, #e0b020, #d4a017);
   color: #000;
 }
 
 .btn-primary:hover {
-  background: #e6b020;
+  background: linear-gradient(to bottom, #d4a017, #c49010);
 }
 
 .btn-secondary {
@@ -214,6 +214,7 @@ body {
   border: 1px solid rgba(212, 160, 23, 0.3);
   border-radius: 8px;
   padding: 20px;
+  box-shadow: 0 2px 12px rgba(0,0,0,0.25);
 }
 
 .category-block h3 {
@@ -325,7 +326,7 @@ body {
 /* ===== GAME BOARD ===== */
 
 .board-header-cell {
-  background: #060ce9;
+  background: #1428e8;
   border: 2px solid #d4a017;
   color: #fff;
   font-weight: bold;
@@ -341,8 +342,8 @@ body {
 }
 
 .board-question-cell {
-  background: #060ce9;
-  border: 2px solid #060ce9;
+  background: #1428e8;
+  border: 2px solid #1428e8;
   color: #d4a017;
   font-size: clamp(1rem, 3vw, 2rem);
   font-weight: bold;
@@ -353,17 +354,18 @@ body {
   align-items: center;
   justify-content: center;
   min-height: 80px;
-  transition: background 0.15s, color 0.15s;
+  transition: background 0.2s ease-out, color 0.2s ease-out;
   user-select: none;
+  box-shadow: inset 0 -3px 0 rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.08);
 }
 
 .board-question-cell:hover:not(.answered) {
-  background: #0a12ff;
+  background: #2a3dff;
   border-color: #d4a017;
 }
 
 .board-question-cell.answered {
-  background: #020770;
+  background: #0a17a0;
   color: transparent;
   cursor: default;
   pointer-events: none;
@@ -394,6 +396,7 @@ body {
   border-radius: 6px;
   margin-bottom: 10px;
   gap: 12px;
+  box-shadow: 0 2px 12px rgba(0,0,0,0.25);
 }
 
 .load-game-info {
@@ -436,8 +439,9 @@ body {
 
 .modal-box {
   position: relative;
-  background: #060ce9;
+  background: #1428e8;
   border: 3px solid #d4a017;
+  box-shadow: 0 8px 40px rgba(0,0,0,0.5);
   border-radius: 8px;
   padding: 36px 40px;
   max-width: 680px;
@@ -551,6 +555,7 @@ body {
 .scoreboard-row.leader {
   color: #d4a017;
   font-weight: bold;
+  text-shadow: 0 0 12px rgba(212,160,23,0.5);
 }
 
 .scoreboard-name {
@@ -594,7 +599,7 @@ body {
 
 .btn-ghost {
   background: transparent;
-  color: rgba(255,255,255,0.45);
+  color: rgba(255,255,255,0.65);
   border: 1px solid rgba(255,255,255,0.2);
 }
 
@@ -653,6 +658,10 @@ body {
   gap: 12px;
 }
 
+.final-rank-row:nth-child(odd) {
+  background: rgba(255,255,255,0.03);
+}
+
 .final-rank-number {
   color: rgba(255,255,255,0.5);
   font-size: 0.8rem;
@@ -677,7 +686,7 @@ body {
   font-weight: bold;
   text-transform: uppercase;
   letter-spacing: 1px;
-  color: #060ce9;
+  color: #1428e8;
   background: #d4a017;
   border-radius: 3px;
   padding: 2px 6px;
