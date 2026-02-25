@@ -57,6 +57,10 @@ class SaveStateRequest(BaseModel):
     players: list
 
 
+class UpdateCategoriesRequest(BaseModel):
+    categories: list
+
+
 @app.get("/api/games")
 def list_games():
     return database.list_games()
@@ -84,6 +88,15 @@ def save_game_state(id: int, payload: SaveStateRequest):
     if game is None:
         raise HTTPException(status_code=404, detail="Game not found.")
     database.update_game_state(id, payload.dict())
+    return {"ok": True}
+
+
+@app.patch("/api/games/{id}/categories", status_code=200)
+def update_categories(id: int, payload: UpdateCategoriesRequest):
+    game = database.get_game(id)
+    if game is None:
+        raise HTTPException(status_code=404, detail="Game not found.")
+    database.update_game_categories(id, payload.categories)
     return {"ok": True}
 
 

@@ -79,6 +79,19 @@ def update_game_state(game_id: int, state_dict: dict):
         conn.close()
 
 
+def update_game_categories(game_id: int, categories: list):
+    conn = get_connection()
+    try:
+        with conn.cursor() as cur:
+            cur.execute(
+                "UPDATE games SET categories = %s WHERE id = %s",
+                (json.dumps(categories), game_id),
+            )
+        conn.commit()
+    finally:
+        conn.close()
+
+
 def create_game(name: str, config: dict, categories: list):
     conn = get_connection()
     try:

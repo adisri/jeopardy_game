@@ -13,6 +13,7 @@ const state = {
   currentCell: null,     // {catIdx, qIdx, ddPlayerIdx: null|int, ddWager: null|int}
   gameId: null,          // int if saved game, null if ephemeral
   pendingResume: null,   // { answeredCells, scores, players } from backend, cleared after use
+  setupCategoryIdx: 0,   // which category is currently shown in the setup wizard
 };
 
 // ===== API CLIENT =====
@@ -55,6 +56,16 @@ async function apiSaveGameState(id, statePayload) {
     body: JSON.stringify(statePayload),
   });
   if (!res.ok) throw new Error('Failed to save game state');
+  return res.json();
+}
+
+async function apiPatchCategories(id, categories) {
+  const res = await fetch(`/api/games/${id}/categories`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ categories }),
+  });
+  if (!res.ok) throw new Error('Failed to update categories');
   return res.json();
 }
 
@@ -139,6 +150,9 @@ function validateAndAdvanceConfig() {
 
   hideError('config-error');
   state.config = { gameName, numCategories: numCat, numQuestions: numQ, pointValues, players };
+  state.setupCategoryIdx = 0;
+  state.gameId = null;
+  state.categories = [];
   buildSetupScreen();
   showScreen('setup');
 }
@@ -167,194 +181,271 @@ function resizeImageToBase64(file) {
 }
 
 // ===== SETUP SCREEN =====
+function emptyCategory(idx) {
+  return {
+    name: '',
+    questions: state.config.pointValues.map(pts => ({
+      question: '', answer: '', points: pts, dailyDouble: false, image: null,
+    })),
+  };
+}
+
+function readCurrentCategoryFromForm(catIdx) {
+  const { numQuestions, pointValues } = state.config;
+  const nameInput = document.querySelector(`input[data-cat="${catIdx}"][data-field="name"]`);
+  const catName = nameInput ? nameInput.value.trim() : '';
+  if (!catName) {
+    return { valid: false, category: null, error: `Category ${catIdx + 1} needs a name.` };
+  }
+
+  const questions = [];
+  for (let q = 0; q < numQuestions; q++) {
+    const qInput = document.querySelector(`input[data-cat="${catIdx}"][data-q="${q}"][data-field="question"]`);
+    const aInput = document.querySelector(`input[data-cat="${catIdx}"][data-q="${q}"][data-field="answer"]`);
+    const ddInput = document.querySelector(`input[data-cat="${catIdx}"][data-q="${q}"][data-field="dailyDouble"]`);
+    const imageInput = document.querySelector(`input[data-cat="${catIdx}"][data-q="${q}"][data-field="imageData"]`);
+    const question = qInput ? qInput.value.trim() : '';
+    const answer = aInput ? aInput.value.trim() : '';
+    const dailyDouble = ddInput ? ddInput.checked : false;
+    const image = imageInput?.value || null;
+    if (!question) {
+      return { valid: false, category: null, error: `Category ${catIdx + 1}, $${pointValues[q]}: question is blank.` };
+    }
+    if (!answer) {
+      return { valid: false, category: null, error: `Category ${catIdx + 1}, $${pointValues[q]}: answer is blank.` };
+    }
+    questions.push({ question, answer, points: pointValues[q], dailyDouble, image });
+  }
+  return { valid: true, category: { name: catName, questions }, error: null };
+}
+
 function buildSetupScreen() {
   const container = document.getElementById('categories-container');
   container.innerHTML = '';
   const { numCategories, numQuestions, pointValues } = state.config;
+  const c = state.setupCategoryIdx;
+  const isLastCategory = c === numCategories - 1;
 
-  for (let c = 0; c < numCategories; c++) {
-    const block = document.createElement('div');
-    block.className = 'category-block';
+  // Build the block for the current category only
+  const block = document.createElement('div');
+  block.className = 'category-block';
 
-    const heading = document.createElement('h3');
-    heading.textContent = `Category ${c + 1}`;
-    block.appendChild(heading);
+  const heading = document.createElement('h3');
+  heading.textContent = `Category ${c + 1}`;
+  block.appendChild(heading);
 
-    const nameRow = document.createElement('div');
-    nameRow.className = 'category-name-row';
-    const nameLabel = document.createElement('label');
-    nameLabel.textContent = 'Category Name';
-    const nameInput = document.createElement('input');
-    nameInput.type = 'text';
-    nameInput.placeholder = `Category ${c + 1} name`;
-    nameInput.dataset.cat = c;
-    nameInput.dataset.field = 'name';
-    // Restore saved value if present
-    if (state.categories[c]) {
-      nameInput.value = state.categories[c].name || '';
+  const nameRow = document.createElement('div');
+  nameRow.className = 'category-name-row';
+  const nameLabel = document.createElement('label');
+  nameLabel.textContent = 'Category Name';
+  const nameInput = document.createElement('input');
+  nameInput.type = 'text';
+  nameInput.placeholder = `Category ${c + 1} name`;
+  nameInput.dataset.cat = c;
+  nameInput.dataset.field = 'name';
+  if (state.categories[c]) {
+    nameInput.value = state.categories[c].name || '';
+  }
+  nameRow.appendChild(nameLabel);
+  nameRow.appendChild(nameInput);
+  block.appendChild(nameRow);
+
+  // Column headers for Q/A/DD
+  const headers = document.createElement('div');
+  headers.className = 'qa-headers';
+  ['Points', 'Question', 'Answer', 'DD'].forEach(t => {
+    const s = document.createElement('span');
+    s.textContent = t;
+    headers.appendChild(s);
+  });
+  block.appendChild(headers);
+
+  for (let q = 0; q < numQuestions; q++) {
+    const row = document.createElement('div');
+    row.className = 'question-row';
+
+    const pts = document.createElement('span');
+    pts.className = 'point-label';
+    pts.textContent = `$${pointValues[q]}`;
+    row.appendChild(pts);
+
+    const qInput = document.createElement('input');
+    qInput.type = 'text';
+    qInput.placeholder = 'Question';
+    qInput.dataset.cat = c;
+    qInput.dataset.q = q;
+    qInput.dataset.field = 'question';
+    if (state.categories[c] && state.categories[c].questions[q]) {
+      qInput.value = state.categories[c].questions[q].question || '';
     }
-    nameRow.appendChild(nameLabel);
-    nameRow.appendChild(nameInput);
-    block.appendChild(nameRow);
+    row.appendChild(qInput);
 
-    // Column headers for Q/A/DD
-    const headers = document.createElement('div');
-    headers.className = 'qa-headers';
-    ['Points', 'Question', 'Answer', 'DD'].forEach(t => {
-      const s = document.createElement('span');
-      s.textContent = t;
-      headers.appendChild(s);
-    });
-    block.appendChild(headers);
+    const answerCell = document.createElement('div');
+    answerCell.className = 'answer-cell';
 
-    for (let q = 0; q < numQuestions; q++) {
-      const row = document.createElement('div');
-      row.className = 'question-row';
+    const aInput = document.createElement('input');
+    aInput.type = 'text';
+    aInput.placeholder = 'Answer';
+    aInput.dataset.cat = c;
+    aInput.dataset.q = q;
+    aInput.dataset.field = 'answer';
+    if (state.categories[c] && state.categories[c].questions[q]) {
+      aInput.value = state.categories[c].questions[q].answer || '';
+    }
+    answerCell.appendChild(aInput);
 
-      const pts = document.createElement('span');
-      pts.className = 'point-label';
-      pts.textContent = `$${pointValues[q]}`;
-      row.appendChild(pts);
+    // Image upload row
+    const imgRow = document.createElement('div');
+    imgRow.className = 'answer-img-row';
 
-      const qInput = document.createElement('input');
-      qInput.type = 'text';
-      qInput.placeholder = 'Question';
-      qInput.dataset.cat = c;
-      qInput.dataset.q = q;
-      qInput.dataset.field = 'question';
-      if (state.categories[c] && state.categories[c].questions[q]) {
-        qInput.value = state.categories[c].questions[q].question || '';
-      }
-      row.appendChild(qInput);
+    const fileInput = document.createElement('input');
+    fileInput.type = 'file';
+    fileInput.accept = 'image/*';
+    fileInput.className = 'answer-img-file-input';
 
-      const answerCell = document.createElement('div');
-      answerCell.className = 'answer-cell';
+    const attachLabel = document.createElement('label');
+    attachLabel.className = 'btn-attach-img';
+    attachLabel.textContent = '+ Image';
+    attachLabel.appendChild(fileInput);
 
-      const aInput = document.createElement('input');
-      aInput.type = 'text';
-      aInput.placeholder = 'Answer';
-      aInput.dataset.cat = c;
-      aInput.dataset.q = q;
-      aInput.dataset.field = 'answer';
-      if (state.categories[c] && state.categories[c].questions[q]) {
-        aInput.value = state.categories[c].questions[q].answer || '';
-      }
-      answerCell.appendChild(aInput);
+    const thumb = document.createElement('img');
+    thumb.className = 'answer-img-thumb hidden';
+    thumb.alt = '';
 
-      // Image upload row
-      const imgRow = document.createElement('div');
-      imgRow.className = 'answer-img-row';
+    const removeBtn = document.createElement('button');
+    removeBtn.type = 'button';
+    removeBtn.className = 'btn-remove-img hidden';
+    removeBtn.textContent = '✕';
 
-      const fileInput = document.createElement('input');
-      fileInput.type = 'file';
-      fileInput.accept = 'image/*';
-      fileInput.className = 'answer-img-file-input';
+    const hiddenInput = document.createElement('input');
+    hiddenInput.type = 'hidden';
+    hiddenInput.dataset.cat = c;
+    hiddenInput.dataset.q = q;
+    hiddenInput.dataset.field = 'imageData';
 
-      const attachLabel = document.createElement('label');
-      attachLabel.className = 'btn-attach-img';
-      attachLabel.textContent = '+ Image';
-      attachLabel.appendChild(fileInput);
+    const savedImage = state.categories[c]?.questions[q]?.image;
+    if (savedImage) {
+      hiddenInput.value = savedImage;
+      thumb.src = savedImage;
+      thumb.classList.remove('hidden');
+      removeBtn.classList.remove('hidden');
+    }
 
-      const thumb = document.createElement('img');
-      thumb.className = 'answer-img-thumb hidden';
-      thumb.alt = '';
-
-      const removeBtn = document.createElement('button');
-      removeBtn.type = 'button';
-      removeBtn.className = 'btn-remove-img hidden';
-      removeBtn.textContent = '✕';
-
-      const hiddenInput = document.createElement('input');
-      hiddenInput.type = 'hidden';
-      hiddenInput.dataset.cat = c;
-      hiddenInput.dataset.q = q;
-      hiddenInput.dataset.field = 'imageData';
-
-      // Restore saved image if present
-      const savedImage = state.categories[c]?.questions[q]?.image;
-      if (savedImage) {
-        hiddenInput.value = savedImage;
-        thumb.src = savedImage;
+    fileInput.addEventListener('change', async () => {
+      const file = fileInput.files[0];
+      if (!file) return;
+      try {
+        const dataUrl = await resizeImageToBase64(file);
+        hiddenInput.value = dataUrl;
+        thumb.src = dataUrl;
         thumb.classList.remove('hidden');
         removeBtn.classList.remove('hidden');
+      } catch (e) {
+        alert('Failed to load image: ' + e.message);
       }
+      fileInput.value = '';
+    });
 
-      fileInput.addEventListener('change', async () => {
-        const file = fileInput.files[0];
-        if (!file) return;
-        try {
-          const dataUrl = await resizeImageToBase64(file);
-          hiddenInput.value = dataUrl;
-          thumb.src = dataUrl;
-          thumb.classList.remove('hidden');
-          removeBtn.classList.remove('hidden');
-        } catch (e) {
-          alert('Failed to load image: ' + e.message);
-        }
-        fileInput.value = '';
-      });
+    removeBtn.addEventListener('click', () => {
+      hiddenInput.value = '';
+      thumb.src = '';
+      thumb.classList.add('hidden');
+      removeBtn.classList.add('hidden');
+    });
 
-      removeBtn.addEventListener('click', () => {
-        hiddenInput.value = '';
-        thumb.src = '';
-        thumb.classList.add('hidden');
-        removeBtn.classList.add('hidden');
-      });
+    imgRow.appendChild(attachLabel);
+    imgRow.appendChild(thumb);
+    imgRow.appendChild(removeBtn);
+    imgRow.appendChild(hiddenInput);
+    answerCell.appendChild(imgRow);
 
-      imgRow.appendChild(attachLabel);
-      imgRow.appendChild(thumb);
-      imgRow.appendChild(removeBtn);
-      imgRow.appendChild(hiddenInput);
-      answerCell.appendChild(imgRow);
+    row.appendChild(answerCell);
 
-      row.appendChild(answerCell);
+    const ddCell = document.createElement('div');
+    ddCell.className = 'dd-checkbox-cell';
+    const ddCheckbox = document.createElement('input');
+    ddCheckbox.type = 'checkbox';
+    ddCheckbox.dataset.cat = c;
+    ddCheckbox.dataset.q = q;
+    ddCheckbox.dataset.field = 'dailyDouble';
+    if (state.categories[c]?.questions[q]?.dailyDouble) ddCheckbox.checked = true;
+    ddCell.appendChild(ddCheckbox);
+    row.appendChild(ddCell);
 
-      const ddCell = document.createElement('div');
-      ddCell.className = 'dd-checkbox-cell';
-      const ddCheckbox = document.createElement('input');
-      ddCheckbox.type = 'checkbox';
-      ddCheckbox.dataset.cat = c;
-      ddCheckbox.dataset.q = q;
-      ddCheckbox.dataset.field = 'dailyDouble';
-      if (state.categories[c]?.questions[q]?.dailyDouble) ddCheckbox.checked = true;
-      ddCell.appendChild(ddCheckbox);
-      row.appendChild(ddCell);
-
-      block.appendChild(row);
-    }
-
-    container.appendChild(block);
-  }
-}
-
-function readSetupFormData() {
-  const { numCategories, numQuestions, pointValues } = state.config;
-  const errors = [];
-  const categories = [];
-
-  for (let c = 0; c < numCategories; c++) {
-    const nameInput = document.querySelector(`input[data-cat="${c}"][data-field="name"]`);
-    const catName = nameInput ? nameInput.value.trim() : '';
-    if (!catName) errors.push(`Category ${c + 1} needs a name.`);
-
-    const questions = [];
-    for (let q = 0; q < numQuestions; q++) {
-      const qInput = document.querySelector(`input[data-cat="${c}"][data-q="${q}"][data-field="question"]`);
-      const aInput = document.querySelector(`input[data-cat="${c}"][data-q="${q}"][data-field="answer"]`);
-      const ddInput = document.querySelector(`input[data-cat="${c}"][data-q="${q}"][data-field="dailyDouble"]`);
-      const imageInput = document.querySelector(`input[data-cat="${c}"][data-q="${q}"][data-field="imageData"]`);
-      const question = qInput ? qInput.value.trim() : '';
-      const answer = aInput ? aInput.value.trim() : '';
-      const dailyDouble = ddInput ? ddInput.checked : false;
-      const image = imageInput?.value || null;
-      if (!question) errors.push(`Category ${c + 1}, $${pointValues[q]}: question is blank.`);
-      if (!answer) errors.push(`Category ${c + 1}, $${pointValues[q]}: answer is blank.`);
-      questions.push({ question, answer, points: pointValues[q], dailyDouble, image });
-    }
-    categories.push({ name: catName, questions });
+    block.appendChild(row);
   }
 
-  return { valid: errors.length === 0, categories, errors };
+  container.appendChild(block);
+
+  // Build navigation buttons
+  const buttonsDiv = document.querySelector('.setup-buttons');
+  buttonsDiv.innerHTML = '';
+
+  const prevBtn = document.createElement('button');
+  prevBtn.className = 'btn btn-back';
+  prevBtn.textContent = '← Previous';
+  if (c === 0) prevBtn.style.visibility = 'hidden';
+  prevBtn.addEventListener('click', () => {
+    const raw = readCurrentCategoryFromForm(c);
+    if (raw.valid) state.categories[c] = raw.category;
+    state.setupCategoryIdx--;
+    buildSetupScreen();
+  });
+  buttonsDiv.appendChild(prevBtn);
+
+  const progress = document.createElement('p');
+  progress.className = 'setup-progress';
+  progress.textContent = `Category ${c + 1} of ${numCategories}`;
+  buttonsDiv.appendChild(progress);
+
+  const nextBtn = document.createElement('button');
+  nextBtn.className = 'btn btn-primary';
+  nextBtn.textContent = isLastCategory ? 'Save & Start Game' : 'Save & Continue →';
+  nextBtn.addEventListener('click', async () => {
+    const { valid, category, error } = readCurrentCategoryFromForm(c);
+    if (!valid) { showError('setup-error', error); return; }
+
+    const gameName = state.config.gameName.trim();
+    if (!gameName) {
+      showError('setup-error', 'Game name is required (enter it on the previous screen).');
+      return;
+    }
+
+    state.categories[c] = category;
+    hideError('setup-error');
+
+    try {
+      if (state.gameId === null) {
+        const allCats = Array.from({ length: numCategories }, (_, i) =>
+          state.categories[i] || emptyCategory(i)
+        );
+        const saved = await apiCreateGame({ name: gameName, config: state.config, categories: allCats });
+        state.gameId = saved.id;
+      } else {
+        const allCats = Array.from({ length: numCategories }, (_, i) =>
+          state.categories[i] || emptyCategory(i)
+        );
+        await apiPatchCategories(state.gameId, allCats);
+      }
+    } catch (e) {
+      if (e.status === 409) {
+        showError('setup-error', `A game named "${gameName}" already exists. Choose a different name.`);
+      } else {
+        showError('setup-error', 'Failed to save: ' + e.message);
+      }
+      return;
+    }
+
+    if (isLastCategory) {
+      state.answeredCells = {};
+      buildBoard();
+      showScreen('board');
+    } else {
+      state.setupCategoryIdx++;
+      buildSetupScreen();
+    }
+  });
+  buttonsDiv.appendChild(nextBtn);
 }
 
 // ===== BOARD =====
@@ -882,43 +973,6 @@ document.getElementById('num-players').addEventListener('input', () => {
 document.getElementById('btn-setup-back').addEventListener('click', () => {
   initConfigScreen();
   showScreen('config');
-});
-
-document.getElementById('btn-save-and-start').addEventListener('click', async () => {
-  const { valid, categories, errors } = readSetupFormData();
-  if (!valid) {
-    showError('setup-error', errors[0]);
-    return;
-  }
-
-  const gameName = state.config.gameName.trim();
-  if (!gameName) {
-    showError('setup-error', 'Please enter a game name to save, or use "Start Without Saving".');
-    return;
-  }
-
-  hideError('setup-error');
-  state.categories = categories;
-
-  try {
-    const saved = await apiCreateGame({
-      name: gameName,
-      config: state.config,
-      categories: state.categories,
-    });
-    state.gameId = saved.id;
-  } catch (e) {
-    if (e.status === 409) {
-      showError('setup-error', `A game named "${gameName}" already exists. Choose a different name.`);
-    } else {
-      showError('setup-error', 'Failed to save game: ' + e.message);
-    }
-    return;
-  }
-
-  state.answeredCells = {};
-  buildBoard();
-  showScreen('board');
 });
 
 // Board

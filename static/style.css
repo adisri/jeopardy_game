@@ -320,7 +320,17 @@ body {
 .setup-buttons {
   display: flex;
   gap: 12px;
-  justify-content: flex-end;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.setup-progress {
+  text-align: center;
+  font-size: 0.85rem;
+  color: rgba(255,255,255,0.6);
+  margin: 0;
+  letter-spacing: 0.05em;
+  flex: 1;
 }
 
 /* ===== GAME BOARD ===== */
