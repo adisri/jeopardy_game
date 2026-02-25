@@ -725,6 +725,20 @@ function initPlayersScreen() {
 }
 
 // ===== LOAD SCREEN =====
+async function doLoadGame(gameId, forceReset = false) {
+  try {
+    const fullGame = await apiGetGame(gameId);
+    state.gameId = fullGame.id;
+    state.config = fullGame.config;
+    state.categories = fullGame.categories;
+    state.pendingResume = forceReset ? null : (fullGame.game_state || null);
+    initPlayersScreen();
+    showScreen('players');
+  } catch (e) {
+    alert('Failed to load game: ' + e.message);
+  }
+}
+
 async function loadGamesScreen() {
   showScreen('load');
   const listEl = document.getElementById('load-game-list');
@@ -767,22 +781,29 @@ async function loadGamesScreen() {
       const actions = document.createElement('div');
       actions.className = 'load-game-actions';
 
-      const loadBtn = document.createElement('button');
-      loadBtn.className = 'btn btn-load';
-      loadBtn.textContent = 'Load';
-      loadBtn.addEventListener('click', async () => {
-        try {
-          const fullGame = await apiGetGame(game.id);
-          state.gameId = fullGame.id;
-          state.config = fullGame.config;
-          state.categories = fullGame.categories;
-          state.pendingResume = fullGame.game_state || null;
-          initPlayersScreen();
-          showScreen('players');
-        } catch (e) {
-          alert('Failed to load game: ' + e.message);
-        }
-      });
+      if (game.has_state) {
+        const resumeBtn = document.createElement('button');
+        resumeBtn.className = 'btn btn-load';
+        resumeBtn.textContent = 'Resume';
+        resumeBtn.addEventListener('click', () => doLoadGame(game.id, false));
+
+        const freshBtn = document.createElement('button');
+        freshBtn.className = 'btn btn-back';
+        freshBtn.textContent = 'New Game';
+        freshBtn.addEventListener('click', () => {
+          if (!confirm(`Starting a new game will erase saved progress for "${game.name}". Continue?`)) return;
+          doLoadGame(game.id, true);
+        });
+
+        actions.appendChild(resumeBtn);
+        actions.appendChild(freshBtn);
+      } else {
+        const loadBtn = document.createElement('button');
+        loadBtn.className = 'btn btn-load';
+        loadBtn.textContent = 'Load';
+        loadBtn.addEventListener('click', () => doLoadGame(game.id, false));
+        actions.appendChild(loadBtn);
+      }
 
       const deleteBtn = document.createElement('button');
       deleteBtn.className = 'btn btn-danger';
@@ -800,7 +821,6 @@ async function loadGamesScreen() {
         }
       });
 
-      actions.appendChild(loadBtn);
       actions.appendChild(deleteBtn);
 
       row.appendChild(info);
