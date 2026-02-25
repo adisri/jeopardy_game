@@ -849,6 +849,13 @@ function hideError(id) {
 
 // Landing
 document.getElementById('btn-new-game').addEventListener('click', () => {
+  state.config = {
+    gameName: '',
+    numCategories: 6,
+    numQuestions: 5,
+    pointValues: [200, 400, 600, 800, 1000],
+    players: ['Player 1', 'Player 2'],
+  };
   initConfigScreen();
   showScreen('config');
 });
