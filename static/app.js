@@ -944,6 +944,7 @@ document.getElementById('btn-dd-reveal').addEventListener('click', confirmDDWage
 
 document.addEventListener('keydown', (e) => {
   if (e.key === 'Escape') {
+    if (!document.getElementById('img-lightbox').classList.contains('hidden')) return;
     const modal = document.getElementById('question-modal');
     if (!modal.classList.contains('hidden')) {
       closeModal(false);
@@ -997,3 +998,26 @@ document.getElementById('btn-final-home').addEventListener('click', () => {
 
 // Load
 document.getElementById('btn-load-back').addEventListener('click', () => showScreen('landing'));
+
+// Lightbox for answer image
+const imgLightbox = document.getElementById('img-lightbox');
+const imgLightboxImg = document.getElementById('img-lightbox-img');
+
+document.getElementById('modal-answer-img').addEventListener('click', () => {
+  const src = document.getElementById('modal-answer-img').src;
+  if (!src) return;
+  imgLightboxImg.src = src;
+  imgLightbox.classList.remove('hidden');
+});
+
+imgLightbox.addEventListener('click', () => {
+  imgLightbox.classList.add('hidden');
+  imgLightboxImg.src = '';
+});
+
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape' && !imgLightbox.classList.contains('hidden')) {
+    imgLightbox.classList.add('hidden');
+    imgLightboxImg.src = '';
+  }
+});
