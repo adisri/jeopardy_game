@@ -1,10 +1,14 @@
+import base64
+import os
+import secrets
 from contextlib import asynccontextmanager
 from psycopg2.errors import UniqueViolation
 
 from fastapi import FastAPI, HTTPException
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, Response
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
+from starlette.middleware.base import BaseHTTPMiddleware
 
 import database
 
@@ -16,6 +20,29 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(lifespan=lifespan)
+
+
+class BasicAuthMiddleware(BaseHTTPMiddleware):
+    async def dispatch(self, request, call_next):
+        auth = request.headers.get("Authorization", "")
+        if auth.startswith("Basic "):
+            try:
+                decoded = base64.b64decode(auth[6:]).decode("utf-8")
+                username, _, password = decoded.partition(":")
+                valid_user = secrets.compare_digest(username, os.environ["AUTH_USER"])
+                valid_pass = secrets.compare_digest(password, os.environ["AUTH_PASS"])
+                if valid_user and valid_pass:
+                    return await call_next(request)
+            except Exception:
+                pass
+        return Response(
+            "Unauthorized",
+            status_code=401,
+            headers={"WWW-Authenticate": 'Basic realm="Jeopardy"'},
+        )
+
+
+app.add_middleware(BasicAuthMiddleware)
 
 
 class CreateGameRequest(BaseModel):
